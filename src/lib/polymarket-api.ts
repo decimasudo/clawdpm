@@ -1,230 +1,219 @@
-// Polymarket CLOB API Service
-import type { Market, Outcome, Trade } from '@/types/polymarket';
+import CryptoJS from 'crypto-js';
+import type { Market, Outcome } from '@/types/polymarket';
 
-const CLOB_API_BASE = 'https://clob.polymarket.com';
-const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+// [PENTING] Gunakan jalur Proxy yang sudah disetting di vite.config.ts
+// Jangan gunakan https://gamma-api... secara langsung di sini agar tidak kena CORS
+const GAMMA_API = '/api/gamma';
+const CLOB_API = '/api/clob';
 
 export class PolymarketAPI {
   private apiKey: string;
   private apiSecret: string;
+  private passphrase: string;
 
-  constructor(apiKey: string, apiSecret: string) {
+  constructor(apiKey: string = '', apiSecret: string = '', passphrase: string = '') {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
+    this.passphrase = passphrase;
   }
 
-  // Generate auth headers for CLOB API
-  private getAuthHeaders(): HeadersInit {
-    const timestamp = Date.now().toString();
-    return {
-      'Content-Type': 'application/json',
-      'POLY_API_KEY': this.apiKey,
-      'POLY_TIMESTAMP': timestamp,
-      'POLY_SIGNATURE': this.apiSecret, // In production, sign with HMAC
-    };
+  // Helper: Membuat Tanda Tangan Digital (Signature) HMAC-SHA256
+  private signRequest(timestamp: string, method: string, path: string, body: string = ''): string {
+    const message = timestamp + method + path + body;
+    const signature = CryptoJS.HmacSHA256(message, this.apiSecret);
+    return CryptoJS.enc.Base64.stringify(signature);
   }
 
-  // Fetch all active markets
-  async getMarkets(limit = 100, offset = 0): Promise<Market[]> {
+  // 1. Fetch Active Markets (Dengan Debug & Proxy)
+  async getMarkets(limit = 50, offset = 0): Promise<Market[]> {
     try {
+      console.log(`[API] Requesting markets from: ${GAMMA_API}...`);
+
       const response = await fetch(
-        `${GAMMA_API_BASE}/markets?limit=${limit}&offset=${offset}&active=true&closed=false`
+        `${GAMMA_API}/markets?closed=false&limit=${limit}&offset=${offset}&active=true&order=volume&ascending=false`,
+        { headers: { 'Accept': 'application/json' } }
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch markets: ${response.status}`);
+        // Log jika server menolak request
+        console.error('[API Error]', response.status, await response.text());
+        return [];
       }
 
       const data = await response.json();
+
+      // [DEBUG] Tampilkan sampel data mentah ke Console
+      // Ini sangat penting untuk melihat apakah Polymarket mengubah nama kolom (misal: 'tokens' jadi 'outcomes')
+      if (Array.isArray(data) && data.length > 0) {
+        console.log('[API DEBUG] Sample Raw Data (Item 0):', data[0]);
+      } else {
+        console.log('[API DEBUG] Data returned is empty or not an array:', data);
+      }
+
       return this.transformMarkets(data);
     } catch (error) {
-      console.error('Error fetching markets:', error);
+      console.error('Failed to fetch markets:', error);
       return [];
     }
   }
 
-  // Fetch single market details
-  async getMarket(marketId: string): Promise<Market | null> {
-    try {
-      const response = await fetch(`${GAMMA_API_BASE}/markets/${marketId}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch market: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return this.transformMarket(data);
-    } catch (error) {
-      console.error('Error fetching market:', error);
-      return null;
-    }
-  }
-
-  // Get order book for a market
-  async getOrderBook(tokenId: string): Promise<{ bids: any[]; asks: any[] }> {
-    try {
-      const response = await fetch(`${CLOB_API_BASE}/book?token_id=${tokenId}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch order book: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching order book:', error);
-      return { bids: [], asks: [] };
-    }
-  }
-
-  // Get current prices for a market
+  // 2. Get Real-time Prices (Order Book)
   async getPrices(tokenId: string): Promise<{ bid: number; ask: number; mid: number }> {
     try {
-      const response = await fetch(`${CLOB_API_BASE}/price?token_id=${tokenId}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch prices: ${response.status}`);
-      }
-
+      const response = await fetch(`${CLOB_API}/price?token_id=${tokenId}`);
+      if (!response.ok) return { bid: 0.5, ask: 0.5, mid: 0.5 };
       const data = await response.json();
       return {
-        bid: parseFloat(data.bid || '0'),
-        ask: parseFloat(data.ask || '0'),
-        mid: parseFloat(data.mid || '0'),
+        bid: parseFloat(data.bid || '0.5'),
+        ask: parseFloat(data.ask || '0.5'),
+        mid: parseFloat(data.mid || '0.5'),
       };
-    } catch (error) {
-      console.error('Error fetching prices:', error);
-      return { bid: 0, ask: 0, mid: 0 };
+    } catch {
+      return { bid: 0.5, ask: 0.5, mid: 0.5 };
     }
   }
 
-  // Place a market order
+  // 3. Place Order (Trading Eksekusi)
   async placeOrder(params: {
     tokenId: string;
     side: 'BUY' | 'SELL';
     size: number;
-    price?: number; // If undefined, market order
+    price?: number;
   }): Promise<{ success: boolean; orderId?: string; error?: string }> {
-    try {
-      const orderPayload = {
-        token_id: params.tokenId,
-        side: params.side,
-        size: params.size.toString(),
-        price: params.price?.toString(),
-        type: params.price ? 'LIMIT' : 'MARKET',
-      };
+    
+    if (!this.hasCredentials()) {
+      return { success: false, error: 'API Key, Secret, & Passphrase required' };
+    }
 
-      const response = await fetch(`${CLOB_API_BASE}/order`, {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const method = 'POST';
+    const path = '/order';
+    
+    const body = JSON.stringify({
+      token_id: params.tokenId,
+      side: params.side,
+      size: params.size,
+      price: params.price,
+      type: params.price ? 'LIMIT' : 'MARKET',
+    });
+
+    const signature = this.signRequest(timestamp, method, path, body);
+
+    try {
+      const response = await fetch(`${CLOB_API}${path}`, {
         method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(orderPayload),
+        headers: {
+          'Content-Type': 'application/json',
+          'POLY_API_KEY': this.apiKey,
+          'POLY_PASSPHRASE': this.passphrase,
+          'POLY_TIMESTAMP': timestamp,
+          'POLY_SIGNATURE': signature,
+        },
+        body: body,
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: errorData.message || `Order failed: ${response.status}`
-        };
+        const errorText = await response.text();
+        return { success: false, error: `Order failed (${response.status}): ${errorText}` };
       }
 
       const data = await response.json();
-      return { success: true, orderId: data.order_id };
+      return { success: true, orderId: data.orderID || data.order_id };
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return { success: false, error: String(error) };
     }
   }
 
-  // Cancel an order
-  async cancelOrder(orderId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${CLOB_API_BASE}/order/${orderId}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      return false;
-    }
-  }
-
-  // Get user's open orders
-  async getOpenOrders(): Promise<any[]> {
-    try {
-      const response = await fetch(`${CLOB_API_BASE}/orders`, {
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch orders: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      return [];
-    }
-  }
-
-  // Transform API response to our Market type
+  // 4. Transform Data (Parsing yang Lebih Kuat)
   private transformMarkets(data: any[]): Market[] {
-    return data.map(this.transformMarket).filter(Boolean) as Market[];
-  }
+    if (!Array.isArray(data)) {
+        console.warn('[API Warning] Received data is not an array');
+        return [];
+    }
 
-  private transformMarket(item: any): Market | null {
-    if (!item) return null;
-
-    try {
+    const transformed = data.map((item: any) => {
       const outcomes: Outcome[] = [];
 
-      // Handle different response formats
-      if (item.tokens && Array.isArray(item.tokens)) {
-        item.tokens.forEach((token: any) => {
-          outcomes.push({
-            id: token.token_id || token.id,
-            name: token.outcome || 'Yes',
-            price: parseFloat(token.price || '0.5'),
+      try {
+        // Cek Format Baru (active, clobTokenIds)
+        if (item.tokens && Array.isArray(item.tokens)) {
+          item.tokens.forEach((token: any) => {
+            outcomes.push({
+              id: token.token_id || '',
+              name: token.outcome || 'Yes',
+              price: parseFloat(token.price || '0'),
+            });
           });
-        });
-      } else if (item.outcomePrices) {
-        const prices = JSON.parse(item.outcomePrices);
-        const names = item.outcomes ? JSON.parse(item.outcomes) : ['Yes', 'No'];
-        prices.forEach((price: string, idx: number) => {
-          outcomes.push({
-            id: `${item.id}-${idx}`,
-            name: names[idx] || `Outcome ${idx + 1}`,
-            price: parseFloat(price),
-          });
-        });
+        } 
+        // Cek Format Lama/Alternatif (outcomePrices JSON string)
+        else if (item.outcomePrices) {
+           try {
+             const prices = JSON.parse(item.outcomePrices);
+             const names = JSON.parse(item.outcomes || '["Yes", "No"]');
+             
+             prices.forEach((price: any, idx: number) => {
+               outcomes.push({
+                 id: `${item.id}-${idx}`, // ID sementara jika token_id tidak ada
+                 name: names[idx] || `Outcome ${idx}`,
+                 price: parseFloat(price),
+               });
+             });
+           } catch (e) { 
+             console.warn('Error parsing JSON outcomes for item:', item.id); 
+           }
+        }
+      } catch (e) {
+          console.warn('Error parsing market item structure:', item.id);
+      }
+
+      // Fallback Darurat: Jika outcomes kosong, buat dummy agar UI tidak crash
+      // Ini hanya agar kita bisa melihat judul market dulu di UI
+      if (outcomes.length === 0) {
+          outcomes.push({ id: 'dummy-yes', name: 'Yes', price: 0.5 }, { id: 'dummy-no', name: 'No', price: 0.5 });
       }
 
       return {
-        id: item.id || item.condition_id,
-        question: item.question || item.title || 'Unknown Market',
+        id: item.id || String(Math.random()),
+        question: item.question || item.title || 'Unknown Market', // Coba field 'title' juga
         slug: item.slug || '',
-        endDate: item.endDate || item.end_date_iso || '',
+        endDate: item.endDate || '',
         liquidity: parseFloat(item.liquidity || '0'),
-        volume: parseFloat(item.volume || item.volumeNum || '0'),
+        volume: parseFloat(item.volume || '0'),
         outcomes,
         active: item.active !== false,
         closed: item.closed === true,
+        category: item.category || 'General',
+        image: item.image || '',
       };
-    } catch (error) {
-      console.error('Error transforming market:', error);
-      return null;
-    }
+    });
+
+    // Kita izinkan semua market lolos dulu untuk debugging (tidak difilter)
+    return transformed;
+  }
+
+  // Utils
+  hasCredentials(): boolean {
+    return !!(this.apiKey && this.apiSecret && this.passphrase);
+  }
+
+  setCredentials(apiKey: string, apiSecret: string, passphrase: string): void {
+    this.apiKey = apiKey;
+    this.apiSecret = apiSecret;
+    this.passphrase = passphrase;
   }
 }
 
-// Singleton instance (will be initialized with config)
+// Singleton Pattern
 let apiInstance: PolymarketAPI | null = null;
 
-export const initializeAPI = (apiKey: string, apiSecret: string): PolymarketAPI => {
-  apiInstance = new PolymarketAPI(apiKey, apiSecret);
+export const initializeAPI = (apiKey?: string, apiSecret?: string, passphrase?: string): PolymarketAPI => {
+  apiInstance = new PolymarketAPI(apiKey || '', apiSecret || '', passphrase || '');
   return apiInstance;
 };
 
-export const getAPI = (): PolymarketAPI | null => apiInstance;
+export const getAPI = (): PolymarketAPI => {
+  if (!apiInstance) {
+    apiInstance = new PolymarketAPI();
+  }
+  return apiInstance;
+};

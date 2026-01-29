@@ -1,4 +1,4 @@
-// Polymarket Types
+// src/types/polymarket.ts
 
 export interface Market {
   id: string;
@@ -9,13 +9,15 @@ export interface Market {
   volume: number;
   outcomes: Outcome[];
   active: boolean;
-  closed: boolean;
+  closed?: boolean;
+  category?: string;
+  image?: string;
 }
 
 export interface Outcome {
   id: string;
   name: string;
-  price: number; // 0-1 representing probability
+  price: number;
 }
 
 export interface Position {
@@ -27,6 +29,7 @@ export interface Position {
   currentPrice: number;
   pnl: number;
   pnlPercent: number;
+  isSimulated?: boolean;
 }
 
 export interface Trade {
@@ -40,6 +43,8 @@ export interface Trade {
   price: number;
   total: number;
   status: 'PENDING' | 'FILLED' | 'CANCELLED' | 'FAILED';
+  isSimulated?: boolean;
+  reasoning?: string;
 }
 
 export interface BettingOpportunity {
@@ -50,13 +55,15 @@ export interface BettingOpportunity {
   confidence: number;
   suggestedAmount: number;
   expectedValue: number;
+  reasoning?: string;
+  keyFactors?: string[];
 }
 
 export interface SafetyLimits {
   maxBetSize: number;
   maxDailyLoss: number;
   maxTotalExposure: number;
-  maxPositionPercent: number; // max % of bankroll in single market
+  maxPositionPercent: number;
   minLiquidity: number;
 }
 
@@ -70,15 +77,20 @@ export interface AgentState {
   opportunities: BettingOpportunity[];
   safetyTriggered: boolean;
   safetyReason?: string;
+  isSimulationMode?: boolean;
+  marketsScanned?: number;
+  lastScanTime?: Date;
 }
 
 export interface AgentConfig {
   apiKey: string;
   apiSecret: string;
+  passphrase: string; // [BARU] Tambahkan field ini
   walletAddress: string;
   safetyLimits: SafetyLimits;
-  undervaluedThreshold: number; // e.g., 0.30 = bet YES when price < 30%
-  overvaluedThreshold: number;  // e.g., 0.80 = bet NO when price > 80%
+  undervaluedThreshold: number;
+  overvaluedThreshold: number;
   scanIntervalMs: number;
   autoExecute: boolean;
+  simulationMode?: boolean;
 }

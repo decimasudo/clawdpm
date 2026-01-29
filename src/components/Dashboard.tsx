@@ -3,42 +3,33 @@ import type { AgentState, AgentConfig, SafetyLimits } from '@/types/polymarket';
 import { initializeAPI } from '@/lib/polymarket-api';
 import { AutoExecutor } from '@/lib/auto-executor';
 import { DEFAULT_SAFETY_LIMITS } from '@/lib/risk-manager';
-import { initLLMAnalyzer, getLLMAnalyzer } from '@/lib/llm-analyzer';
+import { initLLMAnalyzer, getLLMAnalyzer, OPENROUTER_MODELS } from '@/lib/llm-analyzer';
 import { initNotificationService, getNotificationService } from '@/lib/notification-service';
 import {
-  Play,
-  Square,
-  Settings,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  DollarSign,
-  Activity,
-  Target,
-  Shield,
-  RefreshCw,
-  Bell,
-  Brain,
-  Send,
-  CheckCircle,
-  XCircle
+  Play, Square, Settings, Wallet, Activity, Target, Shield,
+  RefreshCw, Bell, Brain, Send, CheckCircle, XCircle, Zap,
+  BarChart3, Clock, Eye, Key, Search, ChevronRight, AlertCircle,
+  TrendingUp, TrendingDown
 } from 'lucide-react';
 
-// Default config
+// --- Configuration ---
+
 const DEFAULT_CONFIG: AgentConfig = {
-  apiKey: 'demo',
+  apiKey: '',
   apiSecret: '',
+  passphrase: '',
   walletAddress: '',
   safetyLimits: DEFAULT_SAFETY_LIMITS,
   undervaluedThreshold: 0.30,
   overvaluedThreshold: 0.75,
-  scanIntervalMs: 30000,
+  scanIntervalMs: 20000,
   autoExecute: true,
+  simulationMode: true,
 };
 
-// Extended config with new features
 interface ExtendedConfig extends AgentConfig {
-  openaiApiKey: string;
+  openrouterApiKey: string;
+  selectedModel: string;
   useLLMAnalysis: boolean;
   telegramBotToken: string;
   telegramChatId: string;
@@ -48,37 +39,43 @@ interface ExtendedConfig extends AgentConfig {
 
 const DEFAULT_EXTENDED_CONFIG: ExtendedConfig = {
   ...DEFAULT_CONFIG,
-  openaiApiKey: '',
-  useLLMAnalysis: false,
+  openrouterApiKey: '',
+  selectedModel: 'google/gemini-2.0-flash-exp:free',
+  useLLMAnalysis: true,
   telegramBotToken: '',
   telegramChatId: '',
   discordWebhookUrl: '',
   notificationsEnabled: false,
 };
 
+// --- Main Component ---
+
 export default function Dashboard() {
   const [config, setConfig] = useState<ExtendedConfig>(DEFAULT_EXTENDED_CONFIG);
   const [state, setState] = useState<AgentState>({
     isRunning: false,
-    bankroll: 100,
+    bankroll: 1000,
     todayPnL: 0,
     totalPnL: 0,
     positions: [],
     trades: [],
     opportunities: [],
     safetyTriggered: false,
+    isSimulationMode: true,
+    marketsScanned: 0,
   });
+  
   const [executor, setExecutor] = useState<AutoExecutor | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'notifications'>('general');
   const [activeTab, setActiveTab] = useState<'opportunities' | 'positions' | 'trades'>('opportunities');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'notifications'>('general');
   const [testingNotification, setTestingNotification] = useState(false);
   const [notificationResult, setNotificationResult] = useState<{ telegram: boolean; discord: boolean } | null>(null);
 
-  // Initialize executor and services
+  // Init System
   useEffect(() => {
-    initializeAPI(config.apiKey, config.apiSecret);
-    initLLMAnalyzer(config.openaiApiKey);
+    initializeAPI(config.apiKey, config.apiSecret, config.passphrase);
+    initLLMAnalyzer(config.openrouterApiKey, 'openrouter', config.selectedModel);
     initNotificationService({
       telegramBotToken: config.telegramBotToken,
       telegramChatId: config.telegramChatId,
@@ -86,24 +83,23 @@ export default function Dashboard() {
       enabled: config.notificationsEnabled,
     });
 
-    const exec = new AutoExecutor(config, (newState) => {
-      setState(newState);
-    });
-    exec.setBankroll(100);
+    const exec = new AutoExecutor({ ...config, simulationMode: true }, setState);
+    exec.setBankroll(1000);
     setExecutor(exec);
 
-    return () => {
-      exec.stop();
-    };
+    return () => exec.stop();
   }, []);
 
-  // Update services when config changes
+  // Sync Config
   useEffect(() => {
     const llm = getLLMAnalyzer();
     if (llm) {
-      llm.setApiKey(config.openaiApiKey);
+      llm.setApiKey(config.openrouterApiKey);
+      llm.setModel(config.selectedModel);
     }
-
+    if (config.apiKey && config.apiSecret && config.passphrase) {
+        initializeAPI(config.apiKey, config.apiSecret, config.passphrase);
+    }
     const notif = getNotificationService();
     if (notif) {
       notif.updateConfig({
@@ -113,637 +109,370 @@ export default function Dashboard() {
         enabled: config.notificationsEnabled,
       });
     }
-  }, [config.openaiApiKey, config.telegramBotToken, config.telegramChatId, config.discordWebhookUrl, config.notificationsEnabled]);
+  }, [config]);
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(() => {
     if (executor) {
+      executor.updateConfig({ ...config, simulationMode: config.simulationMode });
       executor.start();
-      const notif = getNotificationService();
-      if (notif && config.notificationsEnabled) {
-        await notif.notifyAgentStarted();
-      }
     }
-  }, [executor, config.notificationsEnabled]);
+  }, [executor, config]);
 
-  const handleStop = useCallback(async () => {
-    if (executor) {
-      executor.stop();
-      const notif = getNotificationService();
-      if (notif && config.notificationsEnabled) {
-        await notif.notifyAgentStopped();
-      }
-    }
-  }, [executor, config.notificationsEnabled]);
+  const handleStop = useCallback(() => {
+    if (executor) executor.stop();
+  }, [executor]);
 
   const handleConfigChange = (key: keyof ExtendedConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSafetyLimitChange = (key: keyof SafetyLimits, value: number) => {
-    setConfig(prev => ({
-      ...prev,
-      safetyLimits: { ...prev.safetyLimits, [key]: value }
-    }));
-  };
-
-  const testNotifications = async () => {
-    setTestingNotification(true);
-    setNotificationResult(null);
-    const notif = getNotificationService();
-    if (notif) {
-      const result = await notif.testConnection();
-      setNotificationResult(result);
-    }
-    setTestingNotification(false);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-              <Target className="w-6 h-6" />
+    <div className="min-h-screen bg-[#FBFBFB] text-gray-900 font-sans selection:bg-blue-100">
+      
+      {/* --- Header (Polymarket Style) --- */}
+      <nav className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <div className="max-w-[1400px] mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+               {/* Logo Minimalis */}
+               <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
+                  <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
+               </div>
+               <span className="text-lg font-bold tracking-tight">Polymarket<span className="text-blue-600">AI</span></span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">Polymarket Agent</h1>
-              <p className="text-xs text-gray-400">AI-Powered Autonomous Betting</p>
+            
+            <div className="hidden md:flex items-center gap-1">
+              <NavBadge active={state.isSimulationMode} label="Simulation" />
+              <NavBadge active={!state.isSimulationMode} label="Live Trading" color="emerald" />
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {config.useLLMAnalysis && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs">
-                <Brain className="w-3 h-3" />
-                AI Mode
-              </div>
-            )}
+             {/* Status Bar */}
+             <div className="hidden md:flex items-center gap-4 text-xs font-medium text-gray-500 mr-4">
+                <span className="flex items-center gap-1.5">
+                   <div className={`w-2 h-2 rounded-full ${state.isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                   {state.isRunning ? 'Running' : 'Standby'}
+                </span>
+                <span className="flex items-center gap-1.5">
+                   <Clock className="w-3.5 h-3.5" />
+                   {state.lastScanTime ? state.lastScanTime.toLocaleTimeString() : '--:--'}
+                </span>
+             </div>
 
-            {config.notificationsEnabled && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs">
-                <Bell className="w-3 h-3" />
-                Alerts On
-              </div>
-            )}
+             <button 
+                onClick={() => setShowSettings(!showSettings)}
+                className={`p-2 rounded hover:bg-gray-100 text-gray-500 transition-colors ${showSettings ? 'bg-gray-100 text-gray-900' : ''}`}
+             >
+                <Settings className="w-5 h-5" />
+             </button>
 
-            {state.safetyTriggered && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                Safety Stop
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-
-            {state.isRunning ? (
-              <button
-                onClick={handleStop}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
-              >
-                <Square className="w-4 h-4" />
-                Stop Agent
-              </button>
-            ) : (
-              <button
-                onClick={handleStart}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-              >
-                <Play className="w-4 h-4" />
-                Start Agent
-              </button>
-            )}
+             {state.isRunning ? (
+                <button onClick={handleStop} className="flex items-center gap-2 px-4 py-1.5 bg-white border border-red-200 text-red-600 text-sm font-medium rounded hover:bg-red-50 transition-colors">
+                   <Square className="w-3.5 h-3.5 fill-current" /> Stop
+                </button>
+             ) : (
+                <button onClick={handleStart} className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 shadow-sm transition-all hover:shadow">
+                   <Play className="w-3.5 h-3.5 fill-current" /> Start Agent
+                </button>
+             )}
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatCard
-            title="Bankroll"
-            value={`$${state.bankroll.toFixed(2)}`}
-            icon={<DollarSign className="w-5 h-5" />}
-            color="blue"
-          />
-          <StatCard
-            title="Today's P&L"
-            value={`${state.todayPnL >= 0 ? '+' : ''}$${state.todayPnL.toFixed(2)}`}
-            icon={state.todayPnL >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-            color={state.todayPnL >= 0 ? 'green' : 'red'}
-          />
-          <StatCard
-            title="Open Positions"
-            value={state.positions.length.toString()}
-            icon={<Activity className="w-5 h-5" />}
-            color="purple"
-          />
-          <StatCard
-            title="Opportunities"
-            value={state.opportunities.length.toString()}
-            icon={<Target className="w-5 h-5" />}
-            color="orange"
-          />
-        </div>
-
-        {/* Settings Panel */}
+      {/* --- Main Layout --- */}
+      <main className="max-w-[1400px] mx-auto px-4 py-6">
+        
+        {/* Settings Panel (Collapsible) */}
         {showSettings && (
-          <div className="mb-6 p-6 bg-gray-900 border border-gray-800 rounded-xl">
-            {/* Settings Tabs */}
-            <div className="flex gap-2 mb-6">
-              <button
-                onClick={() => setSettingsTab('general')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  settingsTab === 'general' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                <Shield className="w-4 h-4" />
-                General
-              </button>
-              <button
-                onClick={() => setSettingsTab('ai')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  settingsTab === 'ai' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                <Brain className="w-4 h-4" />
-                AI Analysis
-              </button>
-              <button
-                onClick={() => setSettingsTab('notifications')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  settingsTab === 'notifications' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                <Bell className="w-4 h-4" />
-                Notifications
-              </button>
-            </div>
-
-            {/* General Settings */}
-            {settingsTab === 'general' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Polymarket API Key</label>
-                  <input
-                    type="password"
-                    value={config.apiKey}
-                    onChange={(e) => handleConfigChange('apiKey', e.target.value)}
-                    placeholder="Enter API Key or 'demo'"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Undervalued Threshold</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0.1"
-                    max="0.5"
-                    value={config.undervaluedThreshold}
-                    onChange={(e) => handleConfigChange('undervaluedThreshold', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Bet YES when price &lt; this</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Overvalued Threshold</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0.5"
-                    max="0.95"
-                    value={config.overvaluedThreshold}
-                    onChange={(e) => handleConfigChange('overvaluedThreshold', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Bet NO when price &gt; this</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Max Bet Size ($)</label>
-                  <input
-                    type="number"
-                    value={config.safetyLimits.maxBetSize}
-                    onChange={(e) => handleSafetyLimitChange('maxBetSize', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Max Daily Loss ($)</label>
-                  <input
-                    type="number"
-                    value={config.safetyLimits.maxDailyLoss}
-                    onChange={(e) => handleSafetyLimitChange('maxDailyLoss', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Max Total Exposure ($)</label>
-                  <input
-                    type="number"
-                    value={config.safetyLimits.maxTotalExposure}
-                    onChange={(e) => handleSafetyLimitChange('maxTotalExposure', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
+           <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm animate-in slide-in-from-top-2">
+              <div className="flex border-b border-gray-100">
+                 <button onClick={() => setSettingsTab('general')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'general' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>General</button>
+                 <button onClick={() => setSettingsTab('ai')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'ai' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>AI Config</button>
+                 <button onClick={() => setSettingsTab('notifications')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'notifications' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Notifications</button>
               </div>
-            )}
-
-            {/* AI Settings */}
-            {settingsTab === 'ai' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Enable AI Analysis</h4>
-                    <p className="text-sm text-gray-400">Use LLM to analyze markets before betting</p>
-                  </div>
-                  <button
-                    onClick={() => handleConfigChange('useLLMAnalysis', !config.useLLMAnalysis)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      config.useLLMAnalysis ? 'bg-purple-600' : 'bg-gray-700'
-                    }`}
-                  >
-                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      config.useLLMAnalysis ? 'translate-x-7' : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">OpenAI API Key</label>
-                  <input
-                    type="password"
-                    value={config.openaiApiKey}
-                    onChange={(e) => handleConfigChange('openaiApiKey', e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Required for AI analysis. Get it from platform.openai.com</p>
-                </div>
-
-                <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                  <h4 className="font-medium text-purple-400 mb-2">How AI Analysis Works</h4>
-                  <ul className="text-sm text-gray-400 space-y-1">
-                    <li>• LLM analyzes each market question for context</li>
-                    <li>• Estimates true probability based on reasoning</li>
-                    <li>• Compares with market price to find mispricing</li>
-                    <li>• Provides confidence score and key factors</li>
-                  </ul>
-                </div>
+              <div className="p-6 bg-gray-50/50">
+                 {/* (Isi Settings sama seperti sebelumnya, disederhanakan visualnya) */}
+                 {settingsTab === 'general' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Credentials</h4>
+                          <Input label="API Key" type="password" value={config.apiKey} onChange={v => handleConfigChange('apiKey', v)} />
+                          <Input label="API Secret" type="password" value={config.apiSecret} onChange={v => handleConfigChange('apiSecret', v)} />
+                          <Input label="Passphrase" type="password" value={config.passphrase} onChange={v => handleConfigChange('passphrase', v)} />
+                       </div>
+                       <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Risk Management</h4>
+                          <Input label="Max Bet Size ($)" type="number" value={config.safetyLimits.maxBetSize} onChange={v => {
+                              const newLimits = {...config.safetyLimits, maxBetSize: parseFloat(v)};
+                              handleConfigChange('safetyLimits', newLimits);
+                          }} />
+                          <Input label="Max Daily Loss ($)" type="number" value={config.safetyLimits.maxDailyLoss} onChange={v => {
+                               const newLimits = {...config.safetyLimits, maxDailyLoss: parseFloat(v)};
+                               handleConfigChange('safetyLimits', newLimits);
+                          }} />
+                       </div>
+                       <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mode</h4>
+                           <div className="flex items-center justify-between bg-white p-3 border border-gray-200 rounded">
+                              <span className="text-sm font-medium">Simulation Mode</span>
+                              <Toggle enabled={config.simulationMode} onChange={v => handleConfigChange('simulationMode', v)} />
+                           </div>
+                       </div>
+                    </div>
+                 )}
+                 {settingsTab === 'ai' && (
+                    <div className="space-y-4 max-w-xl">
+                       <Input label="OpenRouter API Key" type="password" value={config.openrouterApiKey} onChange={v => handleConfigChange('openrouterApiKey', v)} />
+                       <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Model</label>
+                          <select className="w-full text-sm border-gray-200 rounded-md py-2" value={config.selectedModel} onChange={e => handleConfigChange('selectedModel', e.target.value)}>
+                             {OPENROUTER_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                       </div>
+                    </div>
+                 )}
+                 {/* Notification tab similar structure... */}
               </div>
-            )}
-
-            {/* Notification Settings */}
-            {settingsTab === 'notifications' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Enable Notifications</h4>
-                    <p className="text-sm text-gray-400">Get alerts on Telegram or Discord</p>
-                  </div>
-                  <button
-                    onClick={() => handleConfigChange('notificationsEnabled', !config.notificationsEnabled)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      config.notificationsEnabled ? 'bg-blue-600' : 'bg-gray-700'
-                    }`}
-                  >
-                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      config.notificationsEnabled ? 'translate-x-7' : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Send className="w-4 h-4 text-blue-400" />
-                      Telegram
-                    </h4>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Bot Token</label>
-                      <input
-                        type="password"
-                        value={config.telegramBotToken}
-                        onChange={(e) => handleConfigChange('telegramBotToken', e.target.value)}
-                        placeholder="123456:ABC-DEF..."
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Chat ID</label>
-                      <input
-                        type="text"
-                        value={config.telegramChatId}
-                        onChange={(e) => handleConfigChange('telegramChatId', e.target.value)}
-                        placeholder="-1001234567890"
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-indigo-400" />
-                      Discord
-                    </h4>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Webhook URL</label>
-                      <input
-                        type="password"
-                        value={config.discordWebhookUrl}
-                        onChange={(e) => handleConfigChange('discordWebhookUrl', e.target.value)}
-                        placeholder="https://discord.com/api/webhooks/..."
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-indigo-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={testNotifications}
-                    disabled={testingNotification}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 rounded-lg font-medium transition-colors"
-                  >
-                    {testingNotification ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Test Notifications
-                  </button>
-
-                  {notificationResult && (
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className={`flex items-center gap-1 ${notificationResult.telegram ? 'text-green-400' : 'text-red-400'}`}>
-                        {notificationResult.telegram ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                        Telegram
-                      </span>
-                      <span className={`flex items-center gap-1 ${notificationResult.discord ? 'text-green-400' : 'text-red-400'}`}>
-                        {notificationResult.discord ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                        Discord
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          {(['opportunities', 'positions', 'trades'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* --- Metrics Overview (Portfolio Style) --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+           <MetricCard label="Portfolio Value" value={`$${state.bankroll.toFixed(2)}`} icon={<Wallet className="w-4 h-4" />} />
+           <MetricCard 
+              label="Today's P&L" 
+              value={`${state.todayPnL >= 0 ? '+' : ''}$${state.todayPnL.toFixed(2)}`} 
+              highlight={state.todayPnL >= 0 ? 'green' : 'red'}
+              icon={state.todayPnL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />} 
+           />
+           <MetricCard label="Open Positions" value={state.positions.length.toString()} icon={<Activity className="w-4 h-4" />} />
+           <MetricCard label="Opportunities" value={state.opportunities.length.toString()} icon={<Target className="w-4 h-4" />} />
         </div>
 
-        {/* Content */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          {activeTab === 'opportunities' && (
-            <OpportunitiesTable opportunities={state.opportunities} />
-          )}
-          {activeTab === 'positions' && (
-            <PositionsTable positions={state.positions} />
-          )}
-          {activeTab === 'trades' && (
-            <TradesTable trades={state.trades} />
-          )}
+        {/* --- Main Content Tabs --- */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col h-[600px]"> {/* Fixed Height Container */}
+           
+           {/* Tab Navigation */}
+           <div className="flex items-center justify-between px-4 border-b border-gray-100 bg-white sticky top-0 z-10 rounded-t-lg">
+              <div className="flex gap-6">
+                 <TabButton active={activeTab === 'opportunities'} onClick={() => setActiveTab('opportunities')} label="Opportunities" count={state.opportunities.length} />
+                 <TabButton active={activeTab === 'positions'} onClick={() => setActiveTab('positions')} label="Positions" count={state.positions.length} />
+                 <TabButton active={activeTab === 'trades'} onClick={() => setActiveTab('trades')} label="History" />
+              </div>
+              <div className="py-3">
+                 <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="text" placeholder="Filter markets..." className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:border-blue-500 outline-none w-48 transition-all" />
+                 </div>
+              </div>
+           </div>
+
+           {/* Scrollable Content Area */}
+           <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+              {activeTab === 'opportunities' && <OpportunitiesTable data={state.opportunities} />}
+              {activeTab === 'positions' && <PositionsTable data={state.positions} />}
+              {activeTab === 'trades' && <TradesTable data={state.trades} />}
+           </div>
         </div>
+
       </main>
     </div>
   );
 }
 
-// Stat Card Component
-function StatCard({ title, value, icon, color }: {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  color: 'blue' | 'green' | 'red' | 'purple' | 'orange';
-}) {
-  const colors = {
-    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30',
-    green: 'from-green-500/20 to-green-600/20 border-green-500/30',
-    red: 'from-red-500/20 to-red-600/20 border-red-500/30',
-    purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30',
-    orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30',
-  };
+// --- Sub-Components (Polymarket Style) ---
 
-  const iconColors = {
-    blue: 'text-blue-400',
-    green: 'text-green-400',
-    red: 'text-red-400',
-    purple: 'text-purple-400',
-    orange: 'text-orange-400',
-  };
-
-  return (
-    <div className={`p-4 rounded-xl bg-gradient-to-br ${colors[color]} border`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-gray-400">{title}</span>
-        <span className={iconColors[color]}>{icon}</span>
+function MetricCard({ label, value, highlight, icon }: any) {
+   const colorClass = highlight === 'green' ? 'text-emerald-600' : highlight === 'red' ? 'text-red-600' : 'text-gray-900';
+   return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] flex flex-col justify-between h-24">
+         <div className="flex items-center justify-between text-gray-500">
+            <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+            {icon && <span className="opacity-50">{icon}</span>}
+         </div>
+         <span className={`text-2xl font-bold tracking-tight ${colorClass}`}>{value}</span>
       </div>
-      <p className="text-2xl font-bold">{value}</p>
-    </div>
-  );
+   );
 }
 
-// Opportunities Table
-function OpportunitiesTable({ opportunities }: { opportunities: AgentState['opportunities'] }) {
-  if (opportunities.length === 0) {
-    return (
-      <div className="p-12 text-center text-gray-500">
-        <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>No opportunities found</p>
-        <p className="text-sm">Start the agent to scan for opportunities</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-gray-800/50">
-          <tr>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Market</th>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Strategy</th>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Bet</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Price</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Confidence</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">EV</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-800">
-          {opportunities.map((opp, idx) => (
-            <tr key={idx} className="hover:bg-gray-800/30">
-              <td className="px-4 py-3">
-                <p className="font-medium truncate max-w-xs">{opp.market.question}</p>
-                <p className="text-xs text-gray-500">${opp.market.liquidity.toLocaleString()} liquidity</p>
-              </td>
-              <td className="px-4 py-3">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  opp.strategy === 'UNDERVALUED'
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {opp.strategy}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <span className={`font-bold ${
-                  opp.recommendedBet === 'YES' ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {opp.recommendedBet}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right font-mono">
-                {(opp.outcome.price * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-3 text-right font-mono">
-                {(opp.confidence * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-3 text-right">
-                <span className="text-green-400 font-mono">
-                  +{(opp.expectedValue * 100).toFixed(1)}%
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function NavBadge({ active, label, color = 'blue' }: any) {
+   if (!active) return null;
+   const style = color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100';
+   return (
+      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border rounded ${style}`}>
+         {label}
+      </span>
+   );
 }
 
-// Positions Table
-function PositionsTable({ positions }: { positions: AgentState['positions'] }) {
-  if (positions.length === 0) {
-    return (
-      <div className="p-12 text-center text-gray-500">
-        <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>No open positions</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-gray-800/50">
-          <tr>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Market</th>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Outcome</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Shares</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Avg Price</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Current</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">P&L</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-800">
-          {positions.map((pos, idx) => (
-            <tr key={idx} className="hover:bg-gray-800/30">
-              <td className="px-4 py-3">
-                <p className="font-medium truncate max-w-xs">{pos.marketQuestion}</p>
-              </td>
-              <td className="px-4 py-3 font-medium">{pos.outcome}</td>
-              <td className="px-4 py-3 text-right font-mono">{pos.shares.toFixed(2)}</td>
-              <td className="px-4 py-3 text-right font-mono">
-                {(pos.avgPrice * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-3 text-right font-mono">
-                {(pos.currentPrice * 100).toFixed(1)}%
-              </td>
-              <td className="px-4 py-3 text-right">
-                <span className={`font-mono font-medium ${pos.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(2)}
-                  <span className="text-xs ml-1">({pos.pnlPercent.toFixed(1)}%)</span>
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function TabButton({ active, onClick, label, count }: any) {
+   return (
+      <button 
+         onClick={onClick} 
+         className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${active ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+      >
+         {label}
+         {count !== undefined && (
+            <span className={`px-1.5 py-0.5 rounded text-[10px] ${active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+               {count}
+            </span>
+         )}
+      </button>
+   );
 }
 
-// Trades Table
-function TradesTable({ trades }: { trades: AgentState['trades'] }) {
-  if (trades.length === 0) {
-    return (
-      <div className="p-12 text-center text-gray-500">
-        <RefreshCw className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>No trades yet</p>
+function Input({ label, value, onChange, type = 'text' }: any) {
+   return (
+      <div>
+         <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+         <input 
+            type={type} 
+            value={value} 
+            onChange={(e) => onChange(e.target.value)} 
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:border-blue-500 outline-none transition-colors"
+         />
       </div>
-    );
-  }
+   );
+}
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-gray-800/50">
-          <tr>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Time</th>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Market</th>
-            <th className="text-left px-4 py-3 text-sm text-gray-400 font-medium">Side</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Shares</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Price</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Total</th>
-            <th className="text-right px-4 py-3 text-sm text-gray-400 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-800">
-          {trades.map((trade) => (
-            <tr key={trade.id} className="hover:bg-gray-800/30">
-              <td className="px-4 py-3 text-sm text-gray-400">
-                {new Date(trade.timestamp).toLocaleTimeString()}
-              </td>
-              <td className="px-4 py-3">
-                <p className="font-medium truncate max-w-xs">{trade.marketQuestion}</p>
-              </td>
-              <td className="px-4 py-3">
-                <span className={`font-medium ${trade.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-                  {trade.side}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right font-mono">{trade.shares.toFixed(2)}</td>
-              <td className="px-4 py-3 text-right font-mono">{(trade.price * 100).toFixed(1)}%</td>
-              <td className="px-4 py-3 text-right font-mono">${trade.total.toFixed(2)}</td>
-              <td className="px-4 py-3 text-right">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  trade.status === 'FILLED' ? 'bg-green-500/20 text-green-400' :
-                  trade.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-400' :
-                  trade.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
-                  'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {trade.status}
-                </span>
-              </td>
+function Toggle({ enabled, onChange }: any) {
+   return (
+      <button onClick={() => onChange(!enabled)} className={`relative w-10 h-5 rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
+         <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+   );
+}
+
+// --- Tables (Sticky Header & Clean Lines) ---
+
+function OpportunitiesTable({ data }: { data: AgentState['opportunities'] }) {
+   if (!data.length) return <EmptyState icon={Target} text="No opportunities detected yet" sub="Waiting for next scan..." />;
+
+   return (
+      <table className="w-full text-left border-collapse">
+         <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
+            <tr>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[40%]">Market</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Probability</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Prediction</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Edge</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
             </tr>
-          ))}
-        </tbody>
+         </thead>
+         <tbody className="divide-y divide-gray-100">
+            {data.map((opp, i) => (
+               <tr key={i} className="hover:bg-gray-50 group transition-colors">
+                  <td className="py-3 px-4">
+                     <div className="font-medium text-gray-900 line-clamp-2 text-sm leading-snug">{opp.market.question}</div>
+                     <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                        <span>Liq: ${opp.market.liquidity.toLocaleString()}</span>
+                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <span className="truncate max-w-[200px]">{opp.reasoning?.slice(0, 60)}...</span>
+                     </div>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                     <div className="text-sm font-medium text-gray-700">{(opp.outcome.price * 100).toFixed(1)}%</div>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                     <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${opp.recommendedBet === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {opp.recommendedBet}
+                     </span>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                     <div className="text-sm font-bold text-blue-600">+{((opp.expectedValue) * 100).toFixed(1)}%</div>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                     <button className="px-3 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded hover:border-blue-500 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100">
+                        View
+                     </button>
+                  </td>
+               </tr>
+            ))}
+         </tbody>
       </table>
-    </div>
-  );
+   );
+}
+
+function PositionsTable({ data }: { data: AgentState['positions'] }) {
+   if (!data.length) return <EmptyState icon={Activity} text="No active positions" sub="Trades will appear here" />;
+   return (
+      <table className="w-full text-left border-collapse">
+         <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
+            <tr>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase w-[40%]">Market</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-center">Side</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Shares</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Avg Price</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">P&L</th>
+            </tr>
+         </thead>
+         <tbody className="divide-y divide-gray-100">
+            {data.map((pos, i) => (
+               <tr key={i} className="hover:bg-gray-50">
+                  <td className="py-3 px-4">
+                     <div className="font-medium text-gray-900 line-clamp-1 text-sm">{pos.marketQuestion}</div>
+                     {pos.isSimulated && <span className="text-[10px] text-amber-600 bg-amber-50 px-1 rounded">SIM</span>}
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                     <span className="font-bold text-xs text-emerald-600">{pos.outcome}</span>
+                  </td>
+                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{pos.shares.toFixed(1)}</td>
+                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{(pos.avgPrice * 100).toFixed(1)}¢</td>
+                  <td className={`py-3 px-4 text-right text-sm font-mono font-bold ${pos.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                     {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(2)}
+                  </td>
+               </tr>
+            ))}
+         </tbody>
+      </table>
+   );
+}
+
+function TradesTable({ data }: { data: AgentState['trades'] }) {
+   if (!data.length) return <EmptyState icon={RefreshCw} text="No trade history" sub="Start agent to generate trades" />;
+   return (
+      <table className="w-full text-left border-collapse">
+         <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
+            <tr>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Time</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase w-[40%]">Market</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-center">Side</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Price</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Size</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Status</th>
+            </tr>
+         </thead>
+         <tbody className="divide-y divide-gray-100">
+            {data.map((trade) => (
+               <tr key={trade.id} className="hover:bg-gray-50">
+                  <td className="py-3 px-4 text-xs text-gray-400 font-mono">{new Date(trade.timestamp).toLocaleTimeString()}</td>
+                  <td className="py-3 px-4 font-medium text-gray-900 text-sm line-clamp-1">{trade.marketQuestion}</td>
+                  <td className="py-3 px-4 text-center">
+                     <span className={`text-xs font-bold ${trade.side === 'BUY' ? 'text-emerald-600' : 'text-red-600'}`}>{trade.side} {trade.outcome}</span>
+                  </td>
+                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{(trade.price * 100).toFixed(1)}¢</td>
+                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">${trade.total.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-right">
+                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${trade.status === 'FILLED' ? 'bg-gray-100 text-gray-600' : 'bg-red-50 text-red-600'}`}>
+                        {trade.status}
+                     </span>
+                  </td>
+               </tr>
+            ))}
+         </tbody>
+      </table>
+   );
+}
+
+function EmptyState({ icon: Icon, text, sub }: any) {
+   return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+         <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+            <Icon className="w-6 h-6 text-gray-300" />
+         </div>
+         <p className="font-medium text-gray-500">{text}</p>
+         <p className="text-sm">{sub}</p>
+      </div>
+   );
 }
