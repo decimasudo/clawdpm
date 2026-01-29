@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AgentState, AgentConfig, SafetyLimits } from '@/types/polymarket';
 import { initializeAPI } from '@/lib/polymarket-api';
 import { AutoExecutor } from '@/lib/auto-executor';
 import { DEFAULT_SAFETY_LIMITS } from '@/lib/risk-manager';
-import { initLLMAnalyzer, getLLMAnalyzer, OPENROUTER_MODELS } from '@/lib/llm-analyzer';
+import { initLLMAnalyzer, getLLMAnalyzer } from '@/lib/llm-analyzer';
 import { initNotificationService, getNotificationService } from '@/lib/notification-service';
 import {
-  Square, Settings, Wallet, Activity, Target, Shield,
-  RefreshCw, Bell, Brain, Send, CheckCircle, XCircle, Zap,
-  TrendingUp, TrendingDown, Clock, Search, Github
+  Square, Wallet, Activity, Target,
+  RefreshCw, TrendingUp, TrendingDown, Clock, Github, HelpCircle, ArrowLeft
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -50,6 +50,8 @@ const DEFAULT_EXTENDED_CONFIG: ExtendedConfig = {
 // --- Main Component ---
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  // Config state is kept for internal logic, even if UI is removed
   const [config, setConfig] = useState<ExtendedConfig>(DEFAULT_EXTENDED_CONFIG);
   const [state, setState] = useState<AgentState>({
     isRunning: false,
@@ -65,9 +67,7 @@ export default function Dashboard() {
   });
   
   const [executor, setExecutor] = useState<AutoExecutor | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<'opportunities' | 'positions' | 'trades'>('opportunities');
-  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'notifications'>('general');
 
   // Init System & Auto Start
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function Dashboard() {
     return () => exec.stop();
   }, []);
 
-  // Sync Config
+  // Sync Config (Logic kept if you re-add settings later or load from LS)
   useEffect(() => {
     const llm = getLLMAnalyzer();
     if (llm) {
@@ -119,10 +119,6 @@ export default function Dashboard() {
     if (executor) executor.stop();
   }, [executor]);
 
-  const handleConfigChange = (key: keyof ExtendedConfig, value: any) => {
-    setConfig(prev => ({ ...prev, [key]: value }));
-  };
-
   return (
     <div className="min-h-screen bg-blue-50 text-gray-900 font-sans selection:bg-blue-300">
       
@@ -131,10 +127,12 @@ export default function Dashboard() {
         <div className="max-w-[1400px] mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-               {/* 8-bit Logo */}
+               {/* 8-bit Logo Image */}
                <img src="/logo.jpeg" alt="Logo" className="w-12 h-12 border-2 border-black shadow-hard-sm" />
+               
+               {/* NEW NAME CLAWDPM */}
                <span className="text-xl md:text-2xl font-bold tracking-tight text-blue-700 uppercase drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
-                 clawd<span className="text-black">pm</span>
+                  clawd<span className="text-black">pm</span>
                </span>
             </div>
             
@@ -159,11 +157,13 @@ export default function Dashboard() {
                 </a>
              </div>
              
+             {/* How It Works Button (Replaces Settings) */}
              <button 
-                onClick={() => setShowSettings(!showSettings)}
-                className={`p-2 border-2 border-black shadow-hard-sm hover:translate-y-1 hover:shadow-none transition-none ${showSettings ? 'bg-gray-200' : 'bg-white'}`}
+                onClick={() => navigate('/how-it-works')}
+                className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-black shadow-hard-sm text-xs font-bold uppercase hover:translate-y-1 hover:shadow-none transition-none"
              >
-                <Settings className="w-5 h-5" />
+                <HelpCircle className="w-4 h-4" />
+                <span className="hidden md:inline">How It Works</span>
              </button>
 
              {state.isRunning && (
@@ -178,78 +178,6 @@ export default function Dashboard() {
       {/* --- Main Layout --- */}
       <main className="max-w-[1400px] mx-auto px-4 py-8">
         
-        {/* Settings Panel */}
-        {showSettings && (
-           <div className="mb-8 bg-white border-4 border-black shadow-hard p-1">
-              <div className="flex border-b-4 border-black overflow-x-auto bg-gray-100">
-                 {['general', 'ai', 'notifications'].map((tab) => (
-                    <button 
-                        key={tab}
-                        onClick={() => setSettingsTab(tab as any)} 
-                        className={`px-6 py-4 text-xs font-bold uppercase whitespace-nowrap border-r-2 border-black hover:bg-blue-100 ${settingsTab === tab ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
-                    >
-                        {tab}
-                    </button>
-                 ))}
-              </div>
-              <div className="p-6 bg-white">
-                 {settingsTab === 'general' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                       <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-black uppercase decoration-2 underline underline-offset-4">Credentials</h4>
-                          <Input label="API Key" type="password" value={config.apiKey} onChange={v => handleConfigChange('apiKey', v)} />
-                          <Input label="API Secret" type="password" value={config.apiSecret} onChange={v => handleConfigChange('apiSecret', v)} />
-                          <Input label="Passphrase" type="password" value={config.passphrase} onChange={v => handleConfigChange('passphrase', v)} />
-                       </div>
-                       <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-black uppercase decoration-2 underline underline-offset-4">Risk Mgmt</h4>
-                          <Input label="Max Bet ($)" type="number" value={config.safetyLimits.maxBetSize} onChange={v => {
-                              const newLimits = {...config.safetyLimits, maxBetSize: parseFloat(v)};
-                              handleConfigChange('safetyLimits', newLimits);
-                          }} />
-                          <Input label="Max Loss ($)" type="number" value={config.safetyLimits.maxDailyLoss} onChange={v => {
-                               const newLimits = {...config.safetyLimits, maxDailyLoss: parseFloat(v)};
-                               handleConfigChange('safetyLimits', newLimits);
-                          }} />
-                       </div>
-                       <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-black uppercase decoration-2 underline underline-offset-4">System</h4>
-                           <div className="flex items-center justify-between bg-gray-50 p-4 border-2 border-black shadow-hard-sm">
-                              <span className="text-[10px] font-bold uppercase">Sim Mode</span>
-                              <Toggle enabled={config.simulationMode} onChange={v => handleConfigChange('simulationMode', v)} />
-                           </div>
-                       </div>
-                    </div>
-                 )}
-                 {settingsTab === 'ai' && (
-                    <div className="space-y-6 max-w-xl">
-                       <Input label="OpenRouter Key" type="password" value={config.openrouterApiKey} onChange={v => handleConfigChange('openrouterApiKey', v)} />
-                       <div>
-                          <label className="block text-[10px] font-bold text-black mb-2 uppercase">Model Selection</label>
-                          <select 
-                            className="w-full text-xs border-2 border-black shadow-hard-sm p-3 bg-white outline-none focus:bg-blue-50" 
-                            value={config.selectedModel} 
-                            onChange={e => handleConfigChange('selectedModel', e.target.value)}
-                          >
-                             {OPENROUTER_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
-                       </div>
-                    </div>
-                 )}
-                 {settingsTab === 'notifications' && (
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 bg-white border-2 border-black shadow-hard-sm">
-                        <span className="text-[10px] font-bold uppercase">Enable Notifs</span>
-                        <Toggle enabled={config.notificationsEnabled} onChange={(v) => handleConfigChange('notificationsEnabled', v)} />
-                      </div>
-                      <Input label="Telegram Token" type="password" value={config.telegramBotToken} onChange={v => handleConfigChange('telegramBotToken', v)} />
-                      <Input label="Chat ID" value={config.telegramChatId} onChange={v => handleConfigChange('telegramChatId', v)} />
-                    </div>
-                 )}
-              </div>
-           </div>
-        )}
-
         {/* --- Metrics Overview --- */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
            <MetricCard label="BANKROLL" value={`$${state.bankroll.toFixed(0)}`} icon={<Wallet className="w-5 h-5" />} />
@@ -325,30 +253,7 @@ function TabButton({ active, onClick, label, count }: any) {
    );
 }
 
-function Input({ label, value, onChange, type = 'text' }: any) {
-   return (
-      <div>
-         <label className="block text-[10px] font-bold text-black mb-2 uppercase">{label}</label>
-         <input 
-            type={type} 
-            value={value} 
-            onChange={(e) => onChange(e.target.value)} 
-            className="w-full px-4 py-3 text-xs border-2 border-black shadow-hard-sm outline-none focus:bg-blue-50 placeholder:text-gray-300 font-mono"
-            placeholder="..."
-         />
-      </div>
-   );
-}
-
-function Toggle({ enabled, onChange }: any) {
-   return (
-      <button onClick={() => onChange(!enabled)} className={`relative w-12 h-6 border-2 border-black transition-none ${enabled ? 'bg-green-500' : 'bg-gray-300'}`}>
-         <span className={`absolute top-0 bottom-0 w-5 bg-white border-r-2 border-black transition-all ${enabled ? 'left-[calc(100%-1.25rem)] border-l-2 border-r-0' : 'left-0'}`} />
-      </button>
-   );
-}
-
-// --- Tables (Updated for 8-bit density) ---
+// --- Tables ---
 
 function OpportunitiesTable({ data }: { data: AgentState['opportunities'] }) {
    if (!data.length) return <EmptyState icon={Target} text="SCANNING..." sub="WAITING FOR SIGNAL" />;
@@ -361,6 +266,7 @@ function OpportunitiesTable({ data }: { data: AgentState['opportunities'] }) {
                <th className="py-4 px-4 text-[10px] font-bold text-gray-600 uppercase text-right">Prob</th>
                <th className="py-4 px-4 text-[10px] font-bold text-gray-600 uppercase text-center">Pick</th>
                <th className="py-4 px-4 text-[10px] font-bold text-gray-600 uppercase text-right">Edge</th>
+               <th className="py-4 px-4 text-[10px] font-bold text-gray-600 uppercase text-right hidden md:table-cell">Act</th>
             </tr>
          </thead>
          <tbody className="divide-y-2 divide-gray-100">
@@ -382,6 +288,11 @@ function OpportunitiesTable({ data }: { data: AgentState['opportunities'] }) {
                   </td>
                   <td className="py-4 px-4 text-right">
                      <div className="text-xs font-bold text-blue-600">+{((opp.expectedValue) * 100).toFixed(1)}%</div>
+                  </td>
+                  <td className="py-4 px-4 text-right hidden md:table-cell">
+                     <button className="px-4 py-2 bg-white border-2 border-black text-[8px] font-bold hover:bg-black hover:text-white transition-none shadow-hard-sm active:shadow-none active:translate-y-1">
+                        VIEW
+                     </button>
                   </td>
                </tr>
             ))}
