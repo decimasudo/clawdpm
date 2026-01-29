@@ -1,25 +1,34 @@
 import { useNavigate } from 'react-router-dom';
 import { 
-  Zap, 
   ArrowRight, 
   Brain, 
   Shield, 
   Cpu, 
   Activity 
 } from 'lucide-react';
+import PixelBackground from './PixelBackground';
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans selection:bg-blue-300">
+    <div className="min-h-screen bg-white text-black font-sans selection:bg-blue-300 relative">
       
       {/* --- Navigation --- */}
       <nav className="border-b-4 border-black sticky top-0 bg-white z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-             {/* 8-bit Logo */}
-            <img src="/logo.jpeg" alt="Logo" className="w-10 h-10 border-2 border-black shadow-hard-sm" />
+            
+            {/* --- FIXED LOGO: Static Frame, Moving Character --- */}
+            <div className="w-10 h-10 border-2 border-black shadow-hard-sm bg-white flex items-center justify-center overflow-hidden">
+               {/* Image moves inside the static box */}
+               <img 
+                 src="/logo.jpeg" 
+                 alt="Logo" 
+                 className="w-8 h-8 object-cover animate-pixel-float" 
+               />
+            </div>
+            
             <span className="text-xl font-bold tracking-tight uppercase">clawd<span className="text-black">pm</span></span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-xs font-bold text-gray-600 uppercase">
@@ -36,18 +45,21 @@ export default function LandingPage() {
       </nav>
 
       {/* --- Hero Section --- */}
-      <section className="relative pt-24 pb-32 overflow-hidden bg-blue-50 border-b-4 border-black">
-        {/* Pixel Pattern Background */}
-        <div className="absolute inset-0 -z-10 opacity-10" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+      {/* Removed 'bg-blue-50' here so the PixelBackground is visible */}
+      <section className="relative pt-24 pb-32 overflow-hidden border-b-4 border-black">
         
-        <div className="max-w-7xl mx-auto px-6 text-center">
+        {/* Interactive Background */}
+        <PixelBackground />
+        
+        {/* Added z-10 to ensure text sits on top of the canvas */}
+        <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
           
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-black mb-8 max-w-4xl mx-auto leading-normal uppercase drop-shadow-[4px_4px_0_rgba(255,255,255,1)]">
             Clawdpm  for <br/>
             <span className="text-blue-700 bg-white px-2 border-2 border-black shadow-hard-sm inline-block transform -rotate-1 mt-2">Polymarket</span>
           </h1>
           
-          <p className="text-sm md:text-base text-gray-600 mb-12 max-w-2xl mx-auto leading-loose font-mono">
+          <p className="text-sm md:text-base text-gray-600 mb-12 max-w-2xl mx-auto leading-loose font-mono bg-white/80 backdrop-blur-sm p-4 border-2 border-transparent inline-block">
             An agent inspired by Claude, trained for Polymarket built to find your edge.
           </p>
           

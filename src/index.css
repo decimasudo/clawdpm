@@ -40,7 +40,6 @@
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    /* ... (rest of dark mode vars remain, ensuring radius is 0) */
   }
 }
  
@@ -77,4 +76,18 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #1d4ed8;
+}
+
+/* --- New 8-bit Animations --- */
+@keyframes pixel-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px); /* Moves up 4px */
+  }
+}
+
+.animate-pixel-float {
+  animation: pixel-float 2s ease-in-out infinite;
 }

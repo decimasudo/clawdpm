@@ -10,6 +10,7 @@ import {
   Square, Wallet, Activity, Target,
   RefreshCw, TrendingUp, TrendingDown, Clock, Github, HelpCircle, ArrowLeft
 } from 'lucide-react';
+import PixelBackground from './PixelBackground';
 
 // --- Configuration ---
 
@@ -120,15 +121,22 @@ export default function Dashboard() {
   }, [executor]);
 
   return (
-    <div className="min-h-screen bg-blue-50 text-gray-900 font-sans selection:bg-blue-300">
+    <div className="min-h-screen bg-blue-50 text-gray-900 font-sans selection:bg-blue-300 relative">
+      <PixelBackground />
       
       {/* --- Header --- */}
       <nav className="sticky top-0 z-30 bg-white border-b-4 border-black">
         <div className="max-w-[1400px] mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-               {/* 8-bit Logo Image */}
-               <img src="/logo.jpeg" alt="Logo" className="w-12 h-12 border-2 border-black shadow-hard-sm" />
+               {/* 8-bit Logo - Animated like landing page */}
+               <div className="w-12 h-12 border-2 border-black shadow-hard-sm bg-white flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/logo.jpeg" 
+                    alt="Logo" 
+                    className="w-10 h-10 object-cover animate-pixel-float" 
+                  />
+               </div>
                
                {/* NEW NAME CLAWDPM */}
                <span className="text-xl md:text-2xl font-bold tracking-tight text-blue-700 uppercase drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
