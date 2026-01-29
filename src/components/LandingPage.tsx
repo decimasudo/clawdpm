@@ -43,14 +43,12 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 text-center">
           
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-black mb-8 max-w-4xl mx-auto leading-normal uppercase drop-shadow-[4px_4px_0_rgba(255,255,255,1)]">
-            The AI Edge for <br/>
-            <span className="text-blue-700 bg-white px-2 border-2 border-black shadow-hard-sm inline-block transform -rotate-1 mt-2">Prediction Markets</span>
+            Clawdpm  for <br/>
+            <span className="text-blue-700 bg-white px-2 border-2 border-black shadow-hard-sm inline-block transform -rotate-1 mt-2">Polymarket</span>
           </h1>
           
           <p className="text-sm md:text-base text-gray-600 mb-12 max-w-2xl mx-auto leading-loose font-mono">
-            // AUTOMATE YOUR STRATEGY.<br/>
-            // DETECT MISPRICED MARKETS.<br/>
-            // EXECUTE TRADES 24/7.
+            An agent inspired by Claude, trained for Polymarket built to find your edge.
           </p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-6">
