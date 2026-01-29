@@ -20,7 +20,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-4">
              {/* 8-bit Logo */}
             <img src="/logo.jpeg" alt="Logo" className="w-10 h-10 border-2 border-black shadow-hard-sm" />
-            <span className="text-xl font-bold tracking-tight uppercase">Polymarket<span className="text-blue-700">AI</span></span>
+            <span className="text-xl font-bold tracking-tight uppercase">clawd<span className="text-black">pm</span></span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-xs font-bold text-gray-600 uppercase">
             <a href="#features" className="hover:text-blue-700 hover:underline decoration-2 underline-offset-4">Features</a>
@@ -62,7 +62,7 @@ export default function LandingPage() {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <a href="https://polymarket.com" target="_blank" rel="noreferrer" className="px-8 py-4 bg-white text-black text-sm font-bold uppercase border-4 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none">
-              View Polymarket
+              View Platform
             </a>
           </div>
         </div>
@@ -136,7 +136,7 @@ export default function LandingPage() {
       {/* --- Footer --- */}
       <footer className="py-12 bg-white border-t-4 border-black">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-black text-xs font-bold uppercase">
-          <p>© 2026 PolymarketAI. Open Source.</p>
+          <p>© 2026 clawdpm. Open Source.</p>
           <div className="flex items-center gap-6 mt-4 md:mt-0">
              <span className="flex items-center gap-2"><Activity className="w-4 h-4" /> System Ready</span>
              <a href="#" className="hover:underline">GitHub</a>

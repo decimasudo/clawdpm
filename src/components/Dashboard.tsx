@@ -134,7 +134,7 @@ export default function Dashboard() {
                {/* 8-bit Logo */}
                <img src="/logo.jpeg" alt="Logo" className="w-12 h-12 border-2 border-black shadow-hard-sm" />
                <span className="text-xl md:text-2xl font-bold tracking-tight text-blue-700 uppercase drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
-                 Poly<span className="text-black">AI</span>
+                 clawd<span className="text-black">pm</span>
                </span>
             </div>
             

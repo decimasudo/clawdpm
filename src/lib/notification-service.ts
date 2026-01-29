@@ -202,7 +202,7 @@ ${emoji} <b>Trade ${trade.status}</b>
   // Agent started notification
   async notifyAgentStarted(): Promise<void> {
     const message = `
-🤖 <b>Polymarket Agent Started</b>
+🤖 <b>clawdpm Agent Started</b>
 
 ✅ Agent is now scanning for opportunities
 ⏰ ${new Date().toLocaleString()}
@@ -214,7 +214,7 @@ ${emoji} <b>Trade ${trade.status}</b>
   // Agent stopped notification
   async notifyAgentStopped(): Promise<void> {
     const message = `
-🛑 <b>Polymarket Agent Stopped</b>
+🛑 <b>clawdpm Agent Stopped</b>
 
 ⏰ ${new Date().toLocaleString()}
     `.trim();
@@ -237,11 +237,11 @@ ${emoji} <b>Trade ${trade.status}</b>
     const results = { telegram: false, discord: false };
 
     if (this.config.telegramBotToken && this.config.telegramChatId) {
-      results.telegram = await this.sendTelegram('🧪 Test notification from Polymarket Agent');
+      results.telegram = await this.sendTelegram('🧪 Test notification from clawdpm Agent');
     }
 
     if (this.config.discordWebhookUrl) {
-      results.discord = await this.sendDiscord('🧪 Test notification from Polymarket Agent');
+      results.discord = await this.sendDiscord('🧪 Test notification from clawdpm Agent');
     }
 
     return results;

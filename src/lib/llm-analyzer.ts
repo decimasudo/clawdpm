@@ -109,7 +109,7 @@ Respond ONLY with this exact JSON format:
     // OpenRouter requires additional headers
     if (this.provider === 'openrouter') {
       headers['HTTP-Referer'] = window.location.origin;
-      headers['X-Title'] = 'Polymarket AI Agent';
+      headers['X-Title'] = 'clawdpm Agent';
     }
 
     const body = {
