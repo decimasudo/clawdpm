@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Zap, 
   ArrowRight, 
-  BarChart3, 
   Brain, 
   Shield, 
   Cpu, 
@@ -13,23 +12,22 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-blue-100">
+    <div className="min-h-screen bg-white text-black font-sans selection:bg-blue-300">
       
       {/* --- Navigation --- */}
-      <nav className="border-b border-slate-100 sticky top-0 bg-white/80 backdrop-blur-md z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
-              <Zap className="w-5 h-5 text-white" fill="currentColor" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">Polymarket<span className="text-blue-600">AI</span></span>
+      <nav className="border-b-4 border-black sticky top-0 bg-white z-50">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+             {/* 8-bit Logo */}
+            <img src="/logo.jpeg" alt="Logo" className="w-10 h-10 border-2 border-black shadow-hard-sm" />
+            <span className="text-xl font-bold tracking-tight uppercase">Polymarket<span className="text-blue-700">AI</span></span>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-            <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-blue-600 transition-colors">How it Works</a>
+          <div className="hidden md:flex items-center gap-8 text-xs font-bold text-gray-600 uppercase">
+            <a href="#features" className="hover:text-blue-700 hover:underline decoration-2 underline-offset-4">Features</a>
+            <a href="#how-it-works" className="hover:text-blue-700 hover:underline decoration-2 underline-offset-4">How it Works</a>
             <button 
               onClick={() => navigate('/dashboard')}
-              className="px-5 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-all shadow-md hover:shadow-lg"
+              className="px-6 py-3 bg-black text-white text-[10px] font-bold uppercase shadow-hard hover:translate-y-1 hover:shadow-none transition-none border-2 border-transparent hover:border-black"
             >
               Launch App
             </button>
@@ -38,31 +36,32 @@ export default function LandingPage() {
       </nav>
 
       {/* --- Hero Section --- */}
-      <section className="relative pt-20 pb-32 overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#f0f9ff_1px,transparent_1px),linear-gradient(to_bottom,#f0f9ff_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
-        <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-blue-50 rounded-full blur-3xl opacity-50 translate-x-1/2 -translate-y-1/2"></div>
+      <section className="relative pt-24 pb-32 overflow-hidden bg-blue-50 border-b-4 border-black">
+        {/* Pixel Pattern Background */}
+        <div className="absolute inset-0 -z-10 opacity-10" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
         
         <div className="max-w-7xl mx-auto px-6 text-center">
           
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-black mb-8 max-w-4xl mx-auto leading-normal uppercase drop-shadow-[4px_4px_0_rgba(255,255,255,1)]">
             The AI Edge for <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Prediction Markets</span>
+            <span className="text-blue-700 bg-white px-2 border-2 border-black shadow-hard-sm inline-block transform -rotate-1 mt-2">Prediction Markets</span>
           </h1>
           
-          <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            Automate your betting strategy with LLM-powered analysis. 
-            Detect mispriced markets, manage risk, and execute trades 24/7.
+          <p className="text-sm md:text-base text-gray-600 mb-12 max-w-2xl mx-auto leading-loose font-mono">
+            // AUTOMATE YOUR STRATEGY.<br/>
+            // DETECT MISPRICED MARKETS.<br/>
+            // EXECUTE TRADES 24/7.
           </p>
           
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6">
             <button 
               onClick={() => navigate('/dashboard')}
-              className="group px-8 py-4 bg-blue-600 text-white text-lg font-bold rounded-full hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 flex items-center gap-2"
+              className="group px-8 py-4 bg-blue-600 text-white text-sm font-bold uppercase border-4 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none flex items-center gap-3"
             >
-              Start Trading Now
+              Start Trading
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <a href="https://polymarket.com" target="_blank" rel="noreferrer" className="px-8 py-4 bg-white text-slate-700 font-bold rounded-full border border-slate-200 hover:bg-slate-50 transition-all">
+            <a href="https://polymarket.com" target="_blank" rel="noreferrer" className="px-8 py-4 bg-white text-black text-sm font-bold uppercase border-4 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none">
               View Polymarket
             </a>
           </div>
@@ -70,70 +69,62 @@ export default function LandingPage() {
       </section>
 
       {/* --- Feature Grid --- */}
-      <section id="features" className="py-24 bg-white">
+      <section id="features" className="py-24 bg-white border-b-4 border-black">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Institutional-Grade Features</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">Built for serious traders who want to leverage AI for data-driven decision making.</p>
+            <h2 className="text-2xl font-bold text-black uppercase mb-4 decoration-4 underline underline-offset-8 decoration-blue-500">Institutional Features</h2>
+            <p className="text-gray-500 max-w-2xl mx-auto text-xs font-mono mt-6">BUILT FOR SERIOUS TRADERS.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard 
-              icon={<Brain className="w-8 h-8 text-indigo-600" />}
-              title="LLM Market Analysis"
-              desc="Uses Gemini/OpenAI to read market questions, analyze real-world probabilities, and detect +EV opportunities."
+              icon={<Brain className="w-8 h-8 text-black" />}
+              title="LLM Analysis"
+              desc="Uses Gemini to read markets and calculate real odds."
             />
             <FeatureCard 
-              icon={<Cpu className="w-8 h-8 text-blue-600" />}
-              title="Automated Execution"
-              desc="Set your parameters and let the bot scan, filter, and execute trades on Polymarket automatically."
+              icon={<Cpu className="w-8 h-8 text-blue-700" />}
+              title="Auto Execution"
+              desc="Set parameters. Scan. Filter. Trade. Automatically."
             />
             <FeatureCard 
-              icon={<Shield className="w-8 h-8 text-emerald-600" />}
-              title="Risk Management"
-              desc="Built-in Kelly Criterion sizing, stop-loss limits, and bankroll protection to keep your capital safe."
+              icon={<Shield className="w-8 h-8 text-green-700" />}
+              title="Risk Mgmt"
+              desc="Kelly Criterion sizing & bankroll protection built-in."
             />
           </div>
         </div>
       </section>
 
-      {/* --- How it Works (Steps) --- */}
-      <section id="how-it-works" className="py-24 bg-slate-50 border-y border-slate-200">
+      {/* --- How it Works --- */}
+      <section id="how-it-works" className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center gap-16">
-            <div className="flex-1 space-y-8">
-              <h2 className="text-3xl font-bold text-slate-900">How It Works</h2>
-              <Step number="01" title="Connect API" desc="Securely input your Polymarket Proxy API keys. Keys are stored locally in your browser." />
-              <Step number="02" title="Configure AI" desc="Select your preferred LLM model (Gemini 2.0 Flash recommended) for market analysis." />
-              <Step number="03" title="Start Agent" desc="Watch as the agent scans live markets, calculates odds, and executes trades." />
+            <div className="flex-1 space-y-12">
+              <h2 className="text-2xl font-bold text-black uppercase">How It Works</h2>
+              <Step number="01" title="CONNECT API" desc="Input Proxy API keys. Stored locally." />
+              <Step number="02" title="CONFIGURE AI" desc="Select LLM model (Gemini 2.0 Flash)." />
+              <Step number="03" title="START AGENT" desc="Watch the agent scan & trade live." />
             </div>
             
-            {/* Visual Representation of Dashboard */}
-            <div className="flex-1 relative">
-               <div className="absolute inset-0 bg-blue-600 blur-[80px] opacity-20 rounded-full"></div>
-               <div className="relative bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 rotate-2 hover:rotate-0 transition-transform duration-500">
-                  <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+            {/* 8-bit Visual */}
+            <div className="flex-1">
+               <div className="bg-white border-4 border-black shadow-hard p-6 transform rotate-2 hover:rotate-0 transition-transform">
+                  <div className="flex items-center justify-between mb-6 border-b-4 border-black pb-4">
                      <div className="flex gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                        <div className="w-4 h-4 border-2 border-black bg-white"></div>
+                        <div className="w-4 h-4 border-2 border-black bg-gray-400"></div>
                      </div>
-                     <div className="text-xs font-mono text-slate-400">Live Feed</div>
+                     <div className="text-[10px] font-bold text-black uppercase">Live Feed</div>
                   </div>
-                  <div className="space-y-4">
-                     <div className="h-20 bg-slate-50 rounded-lg border border-slate-100 p-4 flex items-center justify-between">
-                        <div className="space-y-2">
-                           <div className="w-48 h-2 bg-slate-200 rounded"></div>
-                           <div className="w-32 h-2 bg-slate-200 rounded"></div>
-                        </div>
-                        <div className="w-16 h-8 bg-blue-100 rounded text-blue-600 flex items-center justify-center text-xs font-bold">BUY YES</div>
+                  <div className="space-y-4 font-mono text-[10px]">
+                     <div className="bg-blue-50 border-2 border-black p-4 flex items-center justify-between shadow-hard-sm">
+                        <span>&gt; MARKET_SCAN_COMPLETE</span>
+                        <span className="bg-green-400 text-black px-2 border border-black font-bold">BUY YES</span>
                      </div>
-                     <div className="h-20 bg-slate-50 rounded-lg border border-slate-100 p-4 flex items-center justify-between opacity-60">
-                         <div className="space-y-2">
-                           <div className="w-40 h-2 bg-slate-200 rounded"></div>
-                           <div className="w-24 h-2 bg-slate-200 rounded"></div>
-                        </div>
-                        <div className="w-16 h-8 bg-red-50 rounded text-red-400 flex items-center justify-center text-xs font-bold">SKIP</div>
+                     <div className="bg-gray-50 border-2 border-gray-300 p-4 flex items-center justify-between">
+                         <span>&gt; ANALYZING_PROBS...</span>
+                        <span className="bg-gray-200 text-gray-500 px-2 border border-gray-400 font-bold">SKIP</span>
                      </div>
                   </div>
                </div>
@@ -143,13 +134,12 @@ export default function LandingPage() {
       </section>
 
       {/* --- Footer --- */}
-      <footer className="py-12 bg-white border-t border-slate-100">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm">
-          <p>© 2026 PolymarketAI Agent. Open Source Project.</p>
+      <footer className="py-12 bg-white border-t-4 border-black">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-black text-xs font-bold uppercase">
+          <p>© 2026 PolymarketAI. Open Source.</p>
           <div className="flex items-center gap-6 mt-4 md:mt-0">
-             <span className="flex items-center gap-2"><Activity className="w-4 h-4" /> System Operational</span>
-             <a href="#" className="hover:text-slate-900">GitHub</a>
-             <a href="#" className="hover:text-slate-900">Docs</a>
+             <span className="flex items-center gap-2"><Activity className="w-4 h-4" /> System Ready</span>
+             <a href="#" className="hover:underline">GitHub</a>
           </div>
         </div>
       </footer>
@@ -160,21 +150,21 @@ export default function LandingPage() {
 
 function FeatureCard({ icon, title, desc }: any) {
   return (
-    <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all group">
-      <div className="mb-6 p-4 bg-white rounded-xl shadow-sm w-fit group-hover:scale-110 transition-transform">{icon}</div>
-      <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-      <p className="text-slate-500 leading-relaxed">{desc}</p>
+    <div className="p-8 bg-white border-4 border-black shadow-hard hover:-translate-y-1 hover:shadow-[8px_8px_0_0_#000] transition-all">
+      <div className="mb-6">{icon}</div>
+      <h3 className="text-sm font-bold text-black mb-3 uppercase">{title}</h3>
+      <p className="text-gray-600 text-xs leading-relaxed font-mono">{desc}</p>
     </div>
   );
 }
 
 function Step({ number, title, desc }: any) {
    return (
-      <div className="flex gap-6">
-         <span className="text-4xl font-black text-slate-200">{number}</span>
+      <div className="flex gap-6 items-start">
+         <span className="text-3xl font-black text-gray-300 font-sans">{number}</span>
          <div>
-            <h4 className="text-lg font-bold text-slate-900 mb-2">{title}</h4>
-            <p className="text-slate-500">{desc}</p>
+            <h4 className="text-sm font-bold text-black mb-1 uppercase">{title}</h4>
+            <p className="text-gray-600 text-xs font-mono">{desc}</p>
          </div>
       </div>
    );
