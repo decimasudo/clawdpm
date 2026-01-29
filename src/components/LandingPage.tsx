@@ -43,10 +43,6 @@ export default function LandingPage() {
         <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-blue-50 rounded-full blur-3xl opacity-50 translate-x-1/2 -translate-y-1/2"></div>
         
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8 border border-blue-100 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-            Live Beta v1.0
-          </div>
           
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight animate-in fade-in slide-in-from-bottom-8 duration-700">
             The AI Edge for <br/>

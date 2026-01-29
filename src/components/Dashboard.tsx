@@ -6,10 +6,9 @@ import { DEFAULT_SAFETY_LIMITS } from '@/lib/risk-manager';
 import { initLLMAnalyzer, getLLMAnalyzer, OPENROUTER_MODELS } from '@/lib/llm-analyzer';
 import { initNotificationService, getNotificationService } from '@/lib/notification-service';
 import {
-  Play, Square, Settings, Wallet, Activity, Target, Shield,
+  Square, Settings, Wallet, Activity, Target, Shield,
   RefreshCw, Bell, Brain, Send, CheckCircle, XCircle, Zap,
-  BarChart3, Clock, Eye, Key, Search, ChevronRight, AlertCircle,
-  TrendingUp, TrendingDown
+  TrendingUp, TrendingDown, Clock, Search, Github
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -72,7 +71,7 @@ export default function Dashboard() {
   const [testingNotification, setTestingNotification] = useState(false);
   const [notificationResult, setNotificationResult] = useState<{ telegram: boolean; discord: boolean } | null>(null);
 
-  // Init System
+  // Init System & Auto Start
   useEffect(() => {
     initializeAPI(config.apiKey, config.apiSecret, config.passphrase);
     initLLMAnalyzer(config.openrouterApiKey, 'openrouter', config.selectedModel);
@@ -83,12 +82,18 @@ export default function Dashboard() {
       enabled: config.notificationsEnabled,
     });
 
+    // Create Executor
     const exec = new AutoExecutor({ ...config, simulationMode: true }, setState);
     exec.setBankroll(1000);
     setExecutor(exec);
 
+    // ⚡ AUTO START: Langsung jalankan scanning saat dashboard dibuka
+    console.log("🚀 Dashboard mounted, auto-starting agent...");
+    exec.start();
+
+    // Cleanup saat user meninggalkan halaman
     return () => exec.stop();
-  }, []);
+  }, []); // Run once on mount
 
   // Sync Config
   useEffect(() => {
@@ -109,14 +114,12 @@ export default function Dashboard() {
         enabled: config.notificationsEnabled,
       });
     }
-  }, [config]);
-
-  const handleStart = useCallback(() => {
+    
+    // Update executor config on the fly
     if (executor) {
-      executor.updateConfig({ ...config, simulationMode: config.simulationMode });
-      executor.start();
+        executor.updateConfig({ ...config, simulationMode: config.simulationMode });
     }
-  }, [executor, config]);
+  }, [config, executor]); // Dependencies updated
 
   const handleStop = useCallback(() => {
     if (executor) executor.stop();
@@ -129,36 +132,51 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-gray-900 font-sans selection:bg-blue-100">
       
-      {/* --- Header (Polymarket Style) --- */}
+      {/* --- Header --- */}
       <nav className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-[1400px] mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-               {/* Logo Minimalis */}
                <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
                   <Zap className="w-3.5 h-3.5 text-white" fill="currentColor" />
                </div>
                <span className="text-lg font-bold tracking-tight">Polymarket<span className="text-blue-600">AI</span></span>
             </div>
             
-            <div className="hidden md:flex items-center gap-1">
-              <NavBadge active={state.isSimulationMode} label="Simulation" />
-              <NavBadge active={!state.isSimulationMode} label="Live Trading" color="emerald" />
+            {/* Status Indicator (Mobile & Desktop) */}
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-full border border-gray-100">
+                   <div className={`w-1.5 h-1.5 rounded-full ${state.isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                   {state.isRunning ? 'Live' : 'Stopped'}
+                </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-             {/* Status Bar */}
-             <div className="hidden md:flex items-center gap-4 text-xs font-medium text-gray-500 mr-4">
-                <span className="flex items-center gap-1.5">
-                   <div className={`w-2 h-2 rounded-full ${state.isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                   {state.isRunning ? 'Running' : 'Standby'}
-                </span>
-                <span className="flex items-center gap-1.5">
-                   <Clock className="w-3.5 h-3.5" />
-                   {state.lastScanTime ? state.lastScanTime.toLocaleTimeString() : '--:--'}
-                </span>
+             {/* Social Links */}
+             <div className="hidden md:flex items-center gap-1 mr-2">
+                <a 
+                    href="https://github.com/decimasudo/clawdpm" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                    <Github className="w-5 h-5" />
+                </a>
+                <a 
+                    href="#" // Placeholder X link
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                    {/* Custom X Logo SVG */}
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+                    </svg>
+                </a>
              </div>
+             
+             <div className="h-4 w-px bg-gray-200 hidden md:block"></div>
 
              <button 
                 onClick={() => setShowSettings(!showSettings)}
@@ -167,13 +185,10 @@ export default function Dashboard() {
                 <Settings className="w-5 h-5" />
              </button>
 
-             {state.isRunning ? (
-                <button onClick={handleStop} className="flex items-center gap-2 px-4 py-1.5 bg-white border border-red-200 text-red-600 text-sm font-medium rounded hover:bg-red-50 transition-colors">
-                   <Square className="w-3.5 h-3.5 fill-current" /> Stop
-                </button>
-             ) : (
-                <button onClick={handleStart} className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 shadow-sm transition-all hover:shadow">
-                   <Play className="w-3.5 h-3.5 fill-current" /> Start Agent
+             {/* Tombol Stop hanya muncul jika user ingin menghentikan manual */}
+             {state.isRunning && (
+                <button onClick={handleStop} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-medium rounded hover:bg-red-50 transition-colors">
+                   <Square className="w-3 h-3 fill-current" /> Stop
                 </button>
              )}
           </div>
@@ -183,16 +198,15 @@ export default function Dashboard() {
       {/* --- Main Layout --- */}
       <main className="max-w-[1400px] mx-auto px-4 py-6">
         
-        {/* Settings Panel (Collapsible) */}
+        {/* Settings Panel */}
         {showSettings && (
            <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm animate-in slide-in-from-top-2">
-              <div className="flex border-b border-gray-100">
-                 <button onClick={() => setSettingsTab('general')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'general' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>General</button>
-                 <button onClick={() => setSettingsTab('ai')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'ai' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>AI Config</button>
-                 <button onClick={() => setSettingsTab('notifications')} className={`px-5 py-3 text-sm font-medium ${settingsTab === 'notifications' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Notifications</button>
+              <div className="flex border-b border-gray-100 overflow-x-auto">
+                 <button onClick={() => setSettingsTab('general')} className={`px-5 py-3 text-sm font-medium whitespace-nowrap ${settingsTab === 'general' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>General</button>
+                 <button onClick={() => setSettingsTab('ai')} className={`px-5 py-3 text-sm font-medium whitespace-nowrap ${settingsTab === 'ai' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>AI Config</button>
+                 <button onClick={() => setSettingsTab('notifications')} className={`px-5 py-3 text-sm font-medium whitespace-nowrap ${settingsTab === 'notifications' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Notifications</button>
               </div>
               <div className="p-6 bg-gray-50/50">
-                 {/* (Isi Settings sama seperti sebelumnya, disederhanakan visualnya) */}
                  {settingsTab === 'general' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                        <div className="space-y-4">
@@ -232,38 +246,49 @@ export default function Dashboard() {
                        </div>
                     </div>
                  )}
-                 {/* Notification tab similar structure... */}
+                 {settingsTab === 'notifications' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                        <span className="text-sm font-medium">Enable Notifications</span>
+                        <Toggle enabled={config.notificationsEnabled} onChange={(v) => handleConfigChange('notificationsEnabled', v)} />
+                      </div>
+                      <Input label="Telegram Bot Token" type="password" value={config.telegramBotToken} onChange={v => handleConfigChange('telegramBotToken', v)} />
+                      <Input label="Telegram Chat ID" value={config.telegramChatId} onChange={v => handleConfigChange('telegramChatId', v)} />
+                    </div>
+                 )}
               </div>
            </div>
         )}
 
-        {/* --- Metrics Overview (Portfolio Style) --- */}
+        {/* --- Metrics Overview --- */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-           <MetricCard label="Portfolio Value" value={`$${state.bankroll.toFixed(2)}`} icon={<Wallet className="w-4 h-4" />} />
+           <MetricCard label="Portfolio" value={`$${state.bankroll.toFixed(2)}`} icon={<Wallet className="w-4 h-4" />} />
            <MetricCard 
               label="Today's P&L" 
               value={`${state.todayPnL >= 0 ? '+' : ''}$${state.todayPnL.toFixed(2)}`} 
               highlight={state.todayPnL >= 0 ? 'green' : 'red'}
               icon={state.todayPnL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />} 
            />
-           <MetricCard label="Open Positions" value={state.positions.length.toString()} icon={<Activity className="w-4 h-4" />} />
-           <MetricCard label="Opportunities" value={state.opportunities.length.toString()} icon={<Target className="w-4 h-4" />} />
+           <MetricCard label="Active" value={state.positions.length.toString()} icon={<Activity className="w-4 h-4" />} />
+           <MetricCard label="Found" value={state.opportunities.length.toString()} icon={<Target className="w-4 h-4" />} />
         </div>
 
         {/* --- Main Content Tabs --- */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col h-[600px]"> {/* Fixed Height Container */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col h-[600px]">
            
-           {/* Tab Navigation */}
-           <div className="flex items-center justify-between px-4 border-b border-gray-100 bg-white sticky top-0 z-10 rounded-t-lg">
-              <div className="flex gap-6">
+           {/* Tab Navigation (Scrollable on Mobile) */}
+           <div className="flex items-center justify-between border-b border-gray-100 bg-white sticky top-0 z-10 rounded-t-lg">
+              {/* Mobile Friendly Tab Container */}
+              <div className="flex overflow-x-auto no-scrollbar w-full md:w-auto px-4">
                  <TabButton active={activeTab === 'opportunities'} onClick={() => setActiveTab('opportunities')} label="Opportunities" count={state.opportunities.length} />
                  <TabButton active={activeTab === 'positions'} onClick={() => setActiveTab('positions')} label="Positions" count={state.positions.length} />
                  <TabButton active={activeTab === 'trades'} onClick={() => setActiveTab('trades')} label="History" />
               </div>
-              <div className="py-3">
+              
+              <div className="hidden md:block pr-4 py-3">
                  <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" placeholder="Filter markets..." className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:border-blue-500 outline-none w-48 transition-all" />
+                    <input type="text" placeholder="Filter..." className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-full bg-gray-50 focus:bg-white focus:border-blue-500 outline-none w-32 transition-all" />
                  </div>
               </div>
            </div>
@@ -276,33 +301,29 @@ export default function Dashboard() {
            </div>
         </div>
 
+        {/* Footer Info */}
+        <div className="mt-6 flex items-center justify-center text-xs text-gray-400 gap-2">
+            <Clock className="w-3 h-3" />
+            Last Update: {state.lastScanTime ? state.lastScanTime.toLocaleTimeString() : 'Scanning...'}
+        </div>
+
       </main>
     </div>
   );
 }
 
-// --- Sub-Components (Polymarket Style) ---
+// --- Sub-Components ---
 
 function MetricCard({ label, value, highlight, icon }: any) {
    const colorClass = highlight === 'green' ? 'text-emerald-600' : highlight === 'red' ? 'text-red-600' : 'text-gray-900';
    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] flex flex-col justify-between h-24">
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] flex flex-col justify-between h-20 md:h-24">
          <div className="flex items-center justify-between text-gray-500">
-            <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
-            {icon && <span className="opacity-50">{icon}</span>}
+            <span className="text-[10px] md:text-xs font-medium uppercase tracking-wide">{label}</span>
+            {icon && <span className="opacity-50 scale-75 md:scale-100">{icon}</span>}
          </div>
-         <span className={`text-2xl font-bold tracking-tight ${colorClass}`}>{value}</span>
+         <span className={`text-lg md:text-2xl font-bold tracking-tight ${colorClass}`}>{value}</span>
       </div>
-   );
-}
-
-function NavBadge({ active, label, color = 'blue' }: any) {
-   if (!active) return null;
-   const style = color === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100';
-   return (
-      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border rounded ${style}`}>
-         {label}
-      </span>
    );
 }
 
@@ -310,7 +331,7 @@ function TabButton({ active, onClick, label, count }: any) {
    return (
       <button 
          onClick={onClick} 
-         className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${active ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+         className={`py-3 md:py-4 px-3 md:px-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${active ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
       >
          {label}
          {count !== undefined && (
@@ -344,45 +365,45 @@ function Toggle({ enabled, onChange }: any) {
    );
 }
 
-// --- Tables (Sticky Header & Clean Lines) ---
+// --- Tables ---
 
 function OpportunitiesTable({ data }: { data: AgentState['opportunities'] }) {
-   if (!data.length) return <EmptyState icon={Target} text="No opportunities detected yet" sub="Waiting for next scan..." />;
+   if (!data.length) return <EmptyState icon={Target} text="Scanning markets..." sub="Please wait for AI analysis" />;
 
    return (
       <table className="w-full text-left border-collapse">
          <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
             <tr>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[40%]">Market</th>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Probability</th>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Prediction</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Prob</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Pred</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Edge</th>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right hidden md:table-cell">Action</th>
             </tr>
          </thead>
          <tbody className="divide-y divide-gray-100">
             {data.map((opp, i) => (
                <tr key={i} className="hover:bg-gray-50 group transition-colors">
                   <td className="py-3 px-4">
-                     <div className="font-medium text-gray-900 line-clamp-2 text-sm leading-snug">{opp.market.question}</div>
-                     <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                     <div className="font-medium text-gray-900 line-clamp-2 text-xs md:text-sm leading-snug">{opp.market.question}</div>
+                     <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-2">
                         <span>Liq: ${opp.market.liquidity.toLocaleString()}</span>
-                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                        <span className="truncate max-w-[200px]">{opp.reasoning?.slice(0, 60)}...</span>
+                        <span className="hidden md:inline w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <span className="hidden md:inline truncate max-w-[200px]">{opp.reasoning?.slice(0, 60)}...</span>
                      </div>
                   </td>
                   <td className="py-3 px-4 text-right">
-                     <div className="text-sm font-medium text-gray-700">{(opp.outcome.price * 100).toFixed(1)}%</div>
+                     <div className="text-xs md:text-sm font-medium text-gray-700">{(opp.outcome.price * 100).toFixed(1)}%</div>
                   </td>
                   <td className="py-3 px-4 text-center">
-                     <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${opp.recommendedBet === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] md:text-xs font-bold ${opp.recommendedBet === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {opp.recommendedBet}
                      </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                     <div className="text-sm font-bold text-blue-600">+{((opp.expectedValue) * 100).toFixed(1)}%</div>
+                     <div className="text-xs md:text-sm font-bold text-blue-600">+{((opp.expectedValue) * 100).toFixed(1)}%</div>
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3 px-4 text-right hidden md:table-cell">
                      <button className="px-3 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded hover:border-blue-500 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100">
                         View
                      </button>
@@ -403,7 +424,7 @@ function PositionsTable({ data }: { data: AgentState['positions'] }) {
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase w-[40%]">Market</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-center">Side</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Shares</th>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Avg Price</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right hidden md:table-cell">Avg</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">P&L</th>
             </tr>
          </thead>
@@ -411,15 +432,15 @@ function PositionsTable({ data }: { data: AgentState['positions'] }) {
             {data.map((pos, i) => (
                <tr key={i} className="hover:bg-gray-50">
                   <td className="py-3 px-4">
-                     <div className="font-medium text-gray-900 line-clamp-1 text-sm">{pos.marketQuestion}</div>
+                     <div className="font-medium text-gray-900 line-clamp-1 text-xs md:text-sm">{pos.marketQuestion}</div>
                      {pos.isSimulated && <span className="text-[10px] text-amber-600 bg-amber-50 px-1 rounded">SIM</span>}
                   </td>
                   <td className="py-3 px-4 text-center">
                      <span className="font-bold text-xs text-emerald-600">{pos.outcome}</span>
                   </td>
-                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{pos.shares.toFixed(1)}</td>
-                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{(pos.avgPrice * 100).toFixed(1)}¢</td>
-                  <td className={`py-3 px-4 text-right text-sm font-mono font-bold ${pos.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <td className="py-3 px-4 text-right text-xs md:text-sm font-mono text-gray-600">{pos.shares.toFixed(1)}</td>
+                  <td className="py-3 px-4 text-right text-xs md:text-sm font-mono text-gray-600 hidden md:table-cell">{(pos.avgPrice * 100).toFixed(1)}¢</td>
+                  <td className={`py-3 px-4 text-right text-xs md:text-sm font-mono font-bold ${pos.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                      {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(2)}
                   </td>
                </tr>
@@ -430,15 +451,15 @@ function PositionsTable({ data }: { data: AgentState['positions'] }) {
 }
 
 function TradesTable({ data }: { data: AgentState['trades'] }) {
-   if (!data.length) return <EmptyState icon={RefreshCw} text="No trade history" sub="Start agent to generate trades" />;
+   if (!data.length) return <EmptyState icon={RefreshCw} text="No trade history" sub="Recent activity will show here" />;
    return (
       <table className="w-full text-left border-collapse">
          <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
             <tr>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Time</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Time</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase w-[40%]">Market</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-center">Side</th>
-               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Price</th>
+               <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right hidden md:table-cell">Price</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Size</th>
                <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-right">Status</th>
             </tr>
@@ -446,13 +467,13 @@ function TradesTable({ data }: { data: AgentState['trades'] }) {
          <tbody className="divide-y divide-gray-100">
             {data.map((trade) => (
                <tr key={trade.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 text-xs text-gray-400 font-mono">{new Date(trade.timestamp).toLocaleTimeString()}</td>
-                  <td className="py-3 px-4 font-medium text-gray-900 text-sm line-clamp-1">{trade.marketQuestion}</td>
+                  <td className="py-3 px-4 text-xs text-gray-400 font-mono hidden md:table-cell">{new Date(trade.timestamp).toLocaleTimeString()}</td>
+                  <td className="py-3 px-4 font-medium text-gray-900 text-xs md:text-sm line-clamp-1">{trade.marketQuestion}</td>
                   <td className="py-3 px-4 text-center">
                      <span className={`text-xs font-bold ${trade.side === 'BUY' ? 'text-emerald-600' : 'text-red-600'}`}>{trade.side} {trade.outcome}</span>
                   </td>
-                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">{(trade.price * 100).toFixed(1)}¢</td>
-                  <td className="py-3 px-4 text-right text-sm font-mono text-gray-600">${trade.total.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-right text-xs md:text-sm font-mono text-gray-600 hidden md:table-cell">{(trade.price * 100).toFixed(1)}¢</td>
+                  <td className="py-3 px-4 text-right text-xs md:text-sm font-mono text-gray-600">${trade.total.toFixed(2)}</td>
                   <td className="py-3 px-4 text-right">
                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${trade.status === 'FILLED' ? 'bg-gray-100 text-gray-600' : 'bg-red-50 text-red-600'}`}>
                         {trade.status}
