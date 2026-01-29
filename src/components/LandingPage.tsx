@@ -12,7 +12,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans selection:bg-blue-300 relative">
+    <div className="min-h-screen text-black font-sans selection:bg-blue-300 relative">
       
       {/* --- Navigation --- */}
       <nav className="border-b-4 border-black sticky top-0 bg-white z-50">

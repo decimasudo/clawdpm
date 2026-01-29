@@ -121,7 +121,7 @@ export default function Dashboard() {
   }, [executor]);
 
   return (
-    <div className="min-h-screen bg-blue-50 text-gray-900 font-sans selection:bg-blue-300 relative">
+    <div className="min-h-screen text-gray-900 font-sans selection:bg-blue-300 relative">
       <PixelBackground />
       
       {/* --- Header --- */}
