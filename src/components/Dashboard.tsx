@@ -8,7 +8,7 @@ import { initLLMAnalyzer, getLLMAnalyzer } from '@/lib/llm-analyzer';
 import { initNotificationService, getNotificationService } from '@/lib/notification-service';
 import {
   Square, Wallet, Activity, Target,
-  RefreshCw, TrendingUp, TrendingDown, Clock, Github, HelpCircle, ArrowLeft
+  RefreshCw, TrendingUp, TrendingDown, Clock, Github, HelpCircle, ArrowLeft, Twitter
 } from 'lucide-react';
 import PixelBackground from './PixelBackground';
 
@@ -155,6 +155,14 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-4">
              <div className="hidden md:flex items-center gap-2 mr-2">
+                <a 
+                    href="https://x.com/clawdpm" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="p-2 border-2 border-transparent hover:border-black hover:shadow-hard-sm hover:bg-blue-50 transition-none"
+                >
+                    <Twitter className="w-5 h-5" />
+                </a>
                 <a 
                     href="https://github.com/decimasudo/clawdpm" 
                     target="_blank" 

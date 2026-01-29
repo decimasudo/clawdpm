@@ -4,7 +4,9 @@ import {
   Brain, 
   Shield, 
   Cpu, 
-  Activity 
+  Activity,
+  Twitter,
+  Github
 } from 'lucide-react';
 import PixelBackground from './PixelBackground';
 
@@ -73,6 +75,26 @@ export default function LandingPage() {
             </button>
             <a href="https://polymarket.com" target="_blank" rel="noreferrer" className="px-8 py-4 bg-white text-black text-sm font-bold uppercase border-4 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none">
               View Platform
+            </a>
+          </div>
+
+          {/* Social Media Links */}
+          <div className="flex items-center justify-center gap-6 mt-8">
+            <a 
+              href="https://x.com/clawdpm" 
+              target="_blank" 
+              rel="noreferrer"
+              className="p-3 bg-white border-2 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none hover:bg-blue-50"
+            >
+              <Twitter className="w-6 h-6 text-black" />
+            </a>
+            <a 
+              href="https://github.com/decimasudo/clawdpm" 
+              target="_blank" 
+              rel="noreferrer"
+              className="p-3 bg-white border-2 border-black shadow-hard hover:translate-y-1 hover:shadow-none transition-none hover:bg-gray-50"
+            >
+              <Github className="w-6 h-6 text-black" />
             </a>
           </div>
         </div>
